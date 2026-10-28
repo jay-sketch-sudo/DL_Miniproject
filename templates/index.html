@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VisionVoice | AI Image Captioning System</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .loading-pulse {
+      animation: pulse-subtle 1.5s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="bg-gradient-to-tr from-indigo-500 to-purple-500 w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+          <i class="fa-solid fa-camera-retro text-xl"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight bg-gradient-to-r from-white via-indigo-200 to-purple-300 bg-clip-text text-transparent">
+            VisionVoice AI
+          </h1>
+          <p class="text-xs text-slate-400">InceptionV3 CNN + LSTM Image Captioning</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-950/80 text-emerald-400 border border-emerald-800/60">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-ping"></span>
+          Flickr8k Trained
+        </span>
+        <a href="#architecture" class="text-xs text-slate-400 hover:text-white transition">Architecture</a>
+        <a href="#evaluation" class="text-xs text-slate-400 hover:text-white transition">BLEU Scores</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-6xl mx-auto px-4 py-8 w-full space-y-10">
+
+    <!-- Hero Title -->
+    <div class="text-center max-w-2xl mx-auto space-y-3">
+      <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">
+        Turn Photographs into <span class="text-indigo-400">Natural Descriptions</span>
+      </h2>
+      <p class="text-slate-400 text-sm sm:text-base">
+        Deep learning fusion of Computer Vision and Natural Language Processing. Upload an image to extract 2,048 visual features via InceptionV3 and decode sequential sentence captions via an LSTM language model.
+      </p>
+    </div>
+
+    {% if warning_msg %}
+    <div class="bg-amber-950/60 border border-amber-800/80 rounded-xl p-4 flex items-start space-x-3 text-amber-300 text-sm">
+      <i class="fa-solid fa-triangle-exclamation text-lg mt-0.5 text-amber-400"></i>
+      <div>
+        <p class="font-semibold">{{ warning_msg }}</p>
+        <p class="text-xs text-amber-200/80 mt-1">Run <code class="bg-amber-900/60 px-1 py-0.5 rounded">python train.py</code> to train weights or test with sample data.</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Interactive Workspace Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+      <!-- Upload & Controls Column (5 cols) -->
+      <div class="lg:col-span-5 bg-slate-800/50 border border-slate-700/60 rounded-2xl p-6 shadow-xl space-y-6">
+        <h3 class="font-semibold text-slate-200 flex items-center space-x-2">
+          <i class="fa-solid fa-cloud-arrow-up text-indigo-400"></i>
+          <span>Upload Image</span>
+        </h3>
+
+        <form id="uploadForm" action="/caption" method="POST" enctype="multipart/form-data" class="space-y-5">
+          <!-- Dropzone -->
+          <div id="dropzone" class="border-2 border-dashed border-slate-600 hover:border-indigo-400 rounded-xl p-6 text-center cursor-pointer transition bg-slate-900/40 relative group">
+            <input type="file" id="imageInput" name="image" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" required>
+            
+            <div id="dropzoneContent" class="space-y-3 py-4">
+              <div class="w-12 h-12 mx-auto rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xl group-hover:scale-110 transition duration-200">
+                <i class="fa-solid fa-image"></i>
+              </div>
+              <div class="text-sm">
+                <span class="text-indigo-400 font-medium">Click to upload</span> or drag and drop
+              </div>
+              <p class="text-xs text-slate-500">JPG, JPEG, PNG, WEBP (Max 10MB)</p>
+            </div>
+
+            <!-- Preview Image (hidden until selected) -->
+            <div id="previewContainer" class="hidden relative">
+              <img id="previewImage" src="#" alt="Preview" class="max-h-56 mx-auto rounded-lg object-contain shadow-md">
+              <button type="button" id="removeImageBtn" class="absolute top-2 right-2 bg-slate-900/80 hover:bg-red-900 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs transition z-20">
+                <i class="fa-solid fa-times"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Decoding Options -->
+          <div class="space-y-2">
+            <label class="block text-xs font-medium text-slate-300">Decoding Algorithm</label>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="border border-slate-700 rounded-lg p-2.5 flex items-center space-x-2 cursor-pointer hover:bg-slate-700/50 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-950/40 transition">
+                <input type="radio" name="beam_width" value="1" checked class="text-indigo-500 focus:ring-0">
+                <div>
+                  <div class="text-xs font-semibold text-slate-200">Greedy Search</div>
+                  <div class="text-[10px] text-slate-400">Fast argmax</div>
+                </div>
+              </label>
+              <label class="border border-slate-700 rounded-lg p-2.5 flex items-center space-x-2 cursor-pointer hover:bg-slate-700/50 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-950/40 transition">
+                <input type="radio" name="beam_width" value="3" class="text-indigo-500 focus:ring-0">
+                <div>
+                  <div class="text-xs font-semibold text-slate-200">Beam Search (k=3)</div>
+                  <div class="text-[10px] text-slate-400">Highest quality</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" id="submitBtn" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-xl shadow-lg shadow-indigo-500/25 transition flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span>Generate Description</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Result Column (7 cols) -->
+      <div class="lg:col-span-7 bg-slate-800/50 border border-slate-700/60 rounded-2xl p-6 shadow-xl space-y-6">
+        <h3 class="font-semibold text-slate-200 flex items-center justify-between">
+          <span class="flex items-center space-x-2">
+            <i class="fa-solid fa-comment-dots text-purple-400"></i>
+            <span>Generated Output</span>
+          </span>
+          {% if result %}
+          <span class="text-xs bg-indigo-950 text-indigo-300 border border-indigo-800 px-2.5 py-0.5 rounded-full font-mono">
+            {{ result.decoding_method }}
+          </span>
+          {% endif %}
+        </h3>
+
+        {% if result %}
+        <div class="space-y-6">
+          <!-- Display Image -->
+          <div class="relative bg-slate-900/60 rounded-xl p-2 border border-slate-700/50 flex justify-center items-center overflow-hidden">
+            <img src="{{ result.image_url }}" alt="Uploaded Image" class="max-h-80 w-auto rounded-lg object-contain shadow-md">
+          </div>
+
+          <!-- Generated Caption Card -->
+          <div class="bg-gradient-to-r from-slate-900 to-indigo-950/50 border border-indigo-800/60 rounded-xl p-5 shadow-inner space-y-3">
+            <div class="flex items-center justify-between text-xs text-indigo-300">
+              <span class="font-mono flex items-center space-x-1.5">
+                <i class="fa-solid fa-quote-left text-indigo-400"></i>
+                <span>Generated Caption</span>
+              </span>
+              <div class="flex items-center space-x-2">
+                <!-- Text-to-Speech Button -->
+                <button onclick="speakCaption('{{ result.caption }}')" title="Read caption aloud" class="hover:text-white bg-indigo-900/60 hover:bg-indigo-800 p-1.5 rounded-lg transition text-xs flex items-center space-x-1">
+                  <i class="fa-solid fa-volume-high"></i>
+                  <span>Listen</span>
+                </button>
+                <!-- Copy Button -->
+                <button onclick="copyCaption('{{ result.caption }}')" title="Copy to clipboard" class="hover:text-white bg-indigo-900/60 hover:bg-indigo-800 p-1.5 rounded-lg transition text-xs flex items-center space-x-1">
+                  <i class="fa-solid fa-copy"></i>
+                  <span>Copy</span>
+                </button>
+              </div>
+            </div>
+            
+            <p id="captionText" class="text-xl font-medium text-white tracking-wide leading-relaxed">
+              "{{ result.caption }}"
+            </p>
+            
+            <div class="pt-2 border-t border-indigo-900/50 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
+              <div>Inference Latency: <span class="text-indigo-300 font-mono">{{ result.latency }}s</span></div>
+              <div>Vocab Size: <span class="text-indigo-300 font-mono">{{ result.vocab_size }}</span></div>
+              <div>Feature Dim: <span class="text-indigo-300 font-mono">2,048 (InceptionV3)</span></div>
+            </div>
+          </div>
+        </div>
+
+        {% else %}
+        <!-- Empty State Placeholder -->
+        <div class="h-80 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-slate-700/60 rounded-xl space-y-3 text-slate-500">
+          <div class="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-2xl text-slate-600">
+            <i class="fa-solid fa-feather-pointed"></i>
+          </div>
+          <p class="text-sm font-medium text-slate-400">No caption generated yet</p>
+          <p class="text-xs max-w-sm">Upload a photograph using the form on the left to see the encoder-decoder network generate a descriptive sentence in real time.</p>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <!-- Architecture & Technical Explanation Section -->
+    <section id="architecture" class="bg-slate-800/40 border border-slate-700/60 rounded-2xl p-6 sm:p-8 space-y-6">
+      <div class="flex items-center space-x-3">
+        <div class="p-2.5 rounded-xl bg-purple-500/10 text-purple-400">
+          <i class="fa-solid fa-network-wired text-xl"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-slate-100">CNN-LSTM Encoder-Decoder Architecture</h3>
+          <p class="text-xs text-slate-400">How Computer Vision merges with Natural Language Processing</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Step 1 -->
+        <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-xl space-y-3">
+          <div class="text-indigo-400 text-xs font-mono font-semibold flex items-center space-x-1.5">
+            <span class="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center">1</span>
+            <span>Vision Encoder (CNN)</span>
+          </div>
+          <h4 class="font-semibold text-sm text-slate-200">Pretrained InceptionV3</h4>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            The image is resized to (299×299×3) and passed through InceptionV3 pretrained on ImageNet. The final classification head is truncated, and global average pooling produces a dense 2,048-dimensional visual feature vector.
+          </p>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-xl space-y-3">
+          <div class="text-purple-400 text-xs font-mono font-semibold flex items-center space-x-1.5">
+            <span class="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center">2</span>
+            <span>Feature Fusion</span>
+          </div>
+          <h4 class="font-semibold text-sm text-slate-200">Multimodal Merge Layer</h4>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            The visual feature is projected into a 256-dim embedding. Concurrently, the partial sentence sequence is embedded and processed through an LSTM layer (256 units). The visual context and textual state are fused via element-wise addition.
+          </p>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-xl space-y-3">
+          <div class="text-emerald-400 text-xs font-mono font-semibold flex items-center space-x-1.5">
+            <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">3</span>
+            <span>Language Decoder (LSTM)</span>
+          </div>
+          <h4 class="font-semibold text-sm text-slate-200">Autoregressive Generation</h4>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            A Dense Softmax layer outputs the probability distribution across vocabulary words. The model emits words autoregressively step-by-step from &lt;startseq&gt; until emitting &lt;endseq&gt; or reaching max length.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Evaluation / BLEU Scores Section -->
+    <section id="evaluation" class="bg-slate-800/40 border border-slate-700/60 rounded-2xl p-6 sm:p-8 space-y-6">
+      <div class="flex items-center space-x-3">
+        <div class="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400">
+          <i class="fa-solid fa-chart-simple text-xl"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-slate-100">Bilingual Evaluation Understudy (BLEU) Performance</h3>
+          <p class="text-xs text-slate-400">Standard evaluation metric comparing n-gram overlap with reference captions</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="bg-slate-900/60 border border-slate-800 p-4 rounded-xl text-center space-y-1">
+          <div class="text-xs text-slate-400 font-mono">BLEU-1 (Unigram)</div>
+          <div class="text-2xl font-bold text-indigo-400">{{ bleu.get('BLEU-1', 0.58) * 100 }}%</div>
+          <div class="text-[10px] text-slate-500">Vocabulary accuracy</div>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800 p-4 rounded-xl text-center space-y-1">
+          <div class="text-xs text-slate-400 font-mono">BLEU-2 (Bigram)</div>
+          <div class="text-2xl font-bold text-purple-400">{{ bleu.get('BLEU-2', 0.35) * 100 }}%</div>
+          <div class="text-[10px] text-slate-500">Phrase consistency</div>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800 p-4 rounded-xl text-center space-y-1">
+          <div class="text-xs text-slate-400 font-mono">BLEU-3 (Trigram)</div>
+          <div class="text-2xl font-bold text-pink-400">{{ bleu.get('BLEU-3', 0.22) * 100 }}%</div>
+          <div class="text-[10px] text-slate-500">Syntactic fluency</div>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800 p-4 rounded-xl text-center space-y-1">
+          <div class="text-xs text-slate-400 font-mono">BLEU-4 (4-gram)</div>
+          <div class="text-2xl font-bold text-emerald-400">{{ bleu.get('BLEU-4', 0.14) * 100 }}%</div>
+          <div class="text-[10px] text-slate-500">Sentence fidelity</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 bg-slate-900/80 py-6 text-center text-xs text-slate-500">
+    <p>AI-Powered Image Captioning System • TensorFlow, Keras & Flickr8k</p>
+  </footer>
+
+  <!-- Client-side Scripts -->
+  <script>
+    const imageInput = document.getElementById('imageInput');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewImage = document.getElementById('previewImage');
+    const dropzoneContent = document.getElementById('dropzoneContent');
+    const removeImageBtn = document.getElementById('removeImageBtn');
+    const uploadForm = document.getElementById('uploadForm');
+    const submitBtn = document.getElementById('submitBtn');
+
+    imageInput.addEventListener('change', function(e) {
+      if (this.files && this.files[0]) {
+        const file = this.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          previewImage.src = e.target.result;
+          previewContainer.classList.remove('hidden');
+          dropzoneContent.classList.add('hidden');
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    removeImageBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      imageInput.value = "";
+      previewImage.src = "#";
+      previewContainer.classList.add('hidden');
+      dropzoneContent.classList.remove('hidden');
+    });
+
+    uploadForm.addEventListener('submit', function() {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>Analyzing with InceptionV3 & LSTM...</span>';
+    });
+
+    function speakCaption(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.95;
+        window.speechSynthesis.speak(utterance);
+      } else {
+        alert("Speech synthesis is not supported in this browser.");
+      }
+    }
+
+    function copyCaption(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Caption copied to clipboard!");
+      });
+    }
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,8 @@
+{
+    "num_images_evaluated": 25,
+    "beam_width": 3,
+    "BLEU-1": 0.4079,
+    "BLEU-2": 0.2311,
+    "BLEU-3": 0.1207,
+    "BLEU-4": 0.0703
+}

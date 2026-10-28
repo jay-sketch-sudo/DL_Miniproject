@@ -1,0 +1,36 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment & local caches
+.keras/
+.matplotlib/
+.env
+venv/
+env/
+ENV/
+
+# Temporary user uploads
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Checkpoint binaries & large feature caches
+checkpoints/*.keras
+checkpoints/*.h5
+checkpoints/features_*.pkl
+!checkpoints/config.json
+!checkpoints/bleu_scores.json
+!checkpoints/training_log.csv
+!checkpoints/tokenizer.pkl
+
+# Dataset images (use python download_hf_flickr8k.py to stream directly)
+data/Flickr8k_Dataset/*
+!data/Flickr8k_Dataset/.gitkeep
+data/captions.txt
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
